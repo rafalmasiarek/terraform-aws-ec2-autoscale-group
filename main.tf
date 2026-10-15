@@ -46,6 +46,7 @@ module "cloudinit" {
   groups                 = try(var.cloudinit_config.groups, null)
   ssh_authorized_keys    = try(var.cloudinit_config.ssh_authorized_keys, {})
   files                  = try(var.cloudinit_config.files, {})
+  systemd_units          = try(var.cloudinit_config.systemd_units, [])
   commands               = try(var.cloudinit_config.commands, [])
   boot_commands          = try(var.cloudinit_config.boot_commands, [])
   hostname               = try(var.cloudinit_config.hostname, null)

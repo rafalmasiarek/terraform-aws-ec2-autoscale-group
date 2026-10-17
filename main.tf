@@ -251,10 +251,13 @@ resource "aws_autoscaling_group" "this" {
       strategy = coalesce(try(var.instance_refresh.strategy), "rolling")
 
       dynamic "preferences" {
-        for_each = var.instance_refresh != null && var.instance_refresh.preferences != null ? [var.instance_refresh.preferences] : (var.instance_warmup != null ? [{}] : [])
+        for_each = [merge(
+          try(var.instance_refresh.preferences, {}),
+          var.instance_warmup != null ? { instance_warmup = var.instance_warmup } : {}
+        )]
         content {
           min_healthy_percentage = try(preferences.value.min_healthy_percentage, null)
-          instance_warmup        = coalesce(var.instance_warmup, try(preferences.value.instance_warmup, null))
+          instance_warmup        = try(preferences.value.instance_warmup, null)
         }
       }
     }

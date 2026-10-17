@@ -27,29 +27,29 @@ variable "iam_instance_profile_name" {
 variable "cloudinit_config" {
   description = "Typed pass-through to terraform-null-cloudinit. Every field mirrors that module's variables.tf exactly - see https://github.com/rafalmasiarek/terraform-null-cloudinit for full documentation."
   type = object({
-    cloud_config           = optional(any)
-    shell_scripts          = optional(list(string), [])
-    cloudinit_parts        = optional(list(object({
+    cloud_config  = optional(any)
+    shell_scripts = optional(list(string), [])
+    cloudinit_parts = optional(list(object({
       content_type = string
       content      = string
       filename     = optional(string)
       merge_type   = optional(string)
     })), [])
-    gzip                   = optional(bool, false)
-    max_bytes              = optional(number, 16384)
-    scripts                = optional(object({
+    gzip      = optional(bool, false)
+    max_bytes = optional(number, 16384)
+    scripts = optional(object({
       per_boot     = optional(list(string), [])
       per_instance = optional(list(string), [])
       per_once     = optional(list(string), [])
       boothook     = optional(list(string), [])
     }), {})
-    packages               = optional(object({
+    packages = optional(object({
       install            = optional(any, [])
       update             = optional(bool, false)
       upgrade            = optional(bool, false)
       reboot_if_required = optional(bool, false)
     }))
-    users                  = optional(list(object({
+    users = optional(list(object({
       name                = string
       gecos               = optional(string)
       groups              = optional(list(string))
@@ -70,9 +70,9 @@ variable "cloudinit_config" {
       selinux_user        = optional(string)
       extra               = optional(any, {})
     })))
-    groups                 = optional(map(list(string)))
-    ssh_authorized_keys    = optional(list(string), [])
-    files                  = optional(map(object({
+    groups              = optional(map(list(string)))
+    ssh_authorized_keys = optional(list(string), [])
+    files = optional(map(object({
       content     = optional(string, "")
       owner       = optional(string, "root:root")
       permissions = optional(string, "0644")
@@ -81,14 +81,14 @@ variable "cloudinit_config" {
       defer       = optional(bool, false)
       source_uri  = optional(string)
     })), {})
-    systemd_units          = optional(list(object({
+    systemd_units = optional(list(object({
       name    = string
       type    = optional(string, "service")
       content = string
       enabled = optional(bool, false)
       dropins = optional(map(string), {})
     })), [])
-    secrets                = optional(list(object({
+    secrets = optional(list(object({
       name        = string
       destination = string
       source_path = optional(string)
@@ -96,30 +96,30 @@ variable "cloudinit_config" {
       owner       = optional(string)
       permissions = optional(string, "0600")
     })), [])
-    commands               = optional(any, [])
-    boot_commands          = optional(any, [])
-    hostname               = optional(string)
-    fqdn                   = optional(string)
-    preserve_hostname      = optional(bool, false)
-    timezone               = optional(string)
-    mounts                 = optional(list(list(string)), [])
-    swap                   = optional(object({
+    commands          = optional(any, [])
+    boot_commands     = optional(any, [])
+    hostname          = optional(string)
+    fqdn              = optional(string)
+    preserve_hostname = optional(bool, false)
+    timezone          = optional(string)
+    mounts            = optional(list(list(string)), [])
+    swap = optional(object({
       filename = string
       size     = optional(string, "auto")
       maxsize  = optional(string)
     }))
-    growpart               = optional(object({
+    growpart = optional(object({
       mode                     = optional(string, "auto")
       devices                  = optional(list(string), ["/"])
       ignore_growroot_disabled = optional(bool, false)
     }))
-    resize_rootfs          = optional(string)
-    disk_setup             = optional(map(object({
+    resize_rootfs = optional(string)
+    disk_setup = optional(map(object({
       table_type = optional(string, "mbr")
       layout     = optional(any, false)
       overwrite  = optional(bool, false)
     })), {})
-    fs_setup               = optional(list(object({
+    fs_setup = optional(list(object({
       label      = optional(string)
       filesystem = string
       device     = string
@@ -127,24 +127,24 @@ variable "cloudinit_config" {
       overwrite  = optional(bool, false)
       extra_opts = optional(list(string), [])
     })), [])
-    device_aliases         = optional(map(string), {})
-    ssh                    = optional(object({
+    device_aliases = optional(map(string), {})
+    ssh = optional(object({
       enabled              = optional(bool, true)
       emit_keys_to_console = optional(bool, true)
     }))
-    ssh_genkeytypes        = optional(list(string))
-    ssh_deletekeys         = optional(bool)
-    ca_certs               = optional(object({
+    ssh_genkeytypes = optional(list(string))
+    ssh_deletekeys  = optional(bool)
+    ca_certs = optional(object({
       trusted         = optional(list(string), [])
       remove_defaults = optional(bool, false)
     }))
-    ntp                    = optional(object({
+    ntp = optional(object({
       enabled    = optional(bool, true)
       ntp_client = optional(string)
       pools      = optional(list(string), [])
       servers    = optional(list(string), [])
     }))
-    apt                    = optional(object({
+    apt = optional(object({
       preserve_sources_list = optional(bool)
       disable_suites        = optional(list(string), [])
       sources = optional(map(object({
@@ -154,11 +154,11 @@ variable "cloudinit_config" {
         keyserver = optional(string)
       })), {})
     }))
-    yum_repos              = optional(map(object({
+    yum_repos = optional(map(object({
       baseurl = optional(string)
       extra   = optional(any, {})
     })), {})
-    ansible_pull           = optional(list(object({
+    ansible_pull = optional(list(object({
       url             = string
       playbook_names  = list(string)
       checkout        = optional(string)
@@ -168,23 +168,23 @@ variable "cloudinit_config" {
       timeout         = optional(number)
     })), [])
     ansible_install_method = optional(string, "distro")
-    power_state            = optional(object({
+    power_state = optional(object({
       mode      = string
       delay     = optional(string, "now")
       message   = optional(string)
       timeout   = optional(number, 30)
       condition = optional(string, "true")
     }))
-    phone_home             = optional(object({
+    phone_home = optional(object({
       url   = string
       post  = optional(list(string), ["instance_id", "hostname", "fqdn"])
       tries = optional(number, 10)
     }))
-    rsyslog                = optional(object({
+    rsyslog = optional(object({
       configs = optional(list(string), [])
       remotes = optional(map(string), {})
     }))
-    artifacts              = optional(list(object({
+    artifacts = optional(list(object({
       source       = string
       destination  = string
       owner        = optional(string)
@@ -195,7 +195,7 @@ variable "cloudinit_config" {
       extract      = optional(bool, false)
       extract_to   = optional(string)
     })), [])
-    ansible_playbooks      = optional(list(object({
+    ansible_playbooks = optional(list(object({
       path       = string
       inventory  = optional(string, "localhost,")
       connection = optional(string, "local")
@@ -203,8 +203,8 @@ variable "cloudinit_config" {
       tags       = optional(list(string), [])
       become     = optional(bool, true)
     })), [])
-    ansible_core_install   = optional(bool, true)
-    execution_steps        = optional(list(object({
+    ansible_core_install = optional(bool, true)
+    execution_steps = optional(list(object({
       command = string
       cwd     = optional(string)
       env     = optional(map(string), {})
@@ -255,6 +255,19 @@ variable "metadata_options" {
     http_put_response_hop_limit = optional(number, 2)
   })
   default = {}
+
+  validation {
+    condition     = contains(["enabled", "disabled"], var.metadata_options.http_endpoint)
+    error_message = "metadata_options.http_endpoint must be \"enabled\" or \"disabled\"."
+  }
+  validation {
+    condition     = contains(["optional", "required"], var.metadata_options.http_tokens)
+    error_message = "metadata_options.http_tokens must be \"optional\" or \"required\" (IMDSv2)."
+  }
+  validation {
+    condition     = var.metadata_options.http_put_response_hop_limit >= 1 && var.metadata_options.http_put_response_hop_limit <= 64
+    error_message = "metadata_options.http_put_response_hop_limit must be between 1 and 64."
+  }
 }
 
 variable "block_device_mappings" {
@@ -349,7 +362,7 @@ variable "vpc_security_group_ids" {
 }
 
 variable "min_size" {
-  type        = number
+  type = number
   validation {
     condition     = var.min_size >= 0
     error_message = "min_size must be >= 0."
@@ -357,7 +370,7 @@ variable "min_size" {
 }
 
 variable "max_size" {
-  type        = number
+  type = number
   validation {
     condition     = var.max_size >= 1
     error_message = "max_size must be >= 1."
@@ -439,13 +452,13 @@ variable "spot_instance_rebalance_requirements" {
 variable "lifecycle_hooks" {
   description = "ASG lifecycle hooks. Each entry creates one aws_autoscaling_lifecycle_hook."
   type = list(object({
-    name                  = string
-    lifecycle_transition  = optional(string, "autoscaling:EC2_INSTANCE_LAUNCHING")
-    role_arn              = optional(string)
+    name                    = string
+    lifecycle_transition    = optional(string, "autoscaling:EC2_INSTANCE_LAUNCHING")
+    role_arn                = optional(string)
     notification_target_arn = optional(string)
-    notification_metadata = optional(string)
-    heartbeat_timeout     = optional(number, 300)
-    default_result        = optional(string, "CONTINUE")
+    notification_metadata   = optional(string)
+    heartbeat_timeout       = optional(number, 300)
+    default_result          = optional(string, "CONTINUE")
   }))
   default = []
 

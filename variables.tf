@@ -443,12 +443,6 @@ variable "instance_warmup" {
   default     = null
 }
 
-variable "spot_instance_rebalance_requirements" {
-  description = "\"terminate\" to terminate Spot instances when rebalancing notifications are received. Only meaningful with mixed_instances_policy that includes Spot."
-  type        = string
-  default     = null
-}
-
 variable "lifecycle_hooks" {
   description = "ASG lifecycle hooks. Each entry creates one aws_autoscaling_lifecycle_hook."
   type = list(object({

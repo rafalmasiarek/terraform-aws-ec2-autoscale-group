@@ -248,12 +248,12 @@ resource "aws_autoscaling_group" "this" {
   dynamic "instance_refresh" {
     for_each = var.instance_refresh != null || var.instance_warmup != null ? [1] : []
     content {
-      strategy = coalesce(try(var.instance_refresh.strategy), "rolling")
+      strategy = coalesce(try(var.instance_refresh.strategy, null), "rolling")
 
       dynamic "preferences" {
         for_each = [merge(
-          try(var.instance_refresh.preferences, {}),
-          var.instance_warmup != null ? { instance_warmup = var.instance_warmup } : {}
+          var.instance_warmup != null ? { instance_warmup = var.instance_warmup } : {},
+          try(var.instance_refresh.preferences, {})
         )]
         content {
           min_healthy_percentage = try(preferences.value.min_healthy_percentage, null)
@@ -281,7 +281,7 @@ resource "aws_autoscaling_group" "this" {
     }
     precondition {
       condition     = var.desired_capacity == null || (var.desired_capacity >= var.min_size && var.desired_capacity <= var.max_size)
-      error_message = "desired_capacity (${var.desired_capacity}) must be between min_size (${var.min_size}) and max_size (${var.max_size})."
+      error_message = "desired_capacity (${coalesce(var.desired_capacity, "null")}) must be between min_size (${var.min_size}) and max_size (${var.max_size})."
     }
   }
 }

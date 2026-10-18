@@ -33,49 +33,51 @@ locals {
 }
 
 module "cloudinit" {
-  source = "rafalmasiarek/cloudinit/null"
+  source  = "rafalmasiarek/cloudinit/null"
+  version = "~> 0.2.0"
 
-  cloud_config           = try(var.cloudinit_config.cloud_config, null)
-  shell_scripts          = try(var.cloudinit_config.shell_scripts, [])
-  cloudinit_parts        = try(var.cloudinit_config.cloudinit_parts, [])
-  gzip                   = try(var.cloudinit_config.gzip, false)
-  max_bytes              = try(var.cloudinit_config.max_bytes, 16384)
-  scripts                = try(var.cloudinit_config.scripts, {})
-  packages               = try(var.cloudinit_config.packages, null)
-  users                  = try(var.cloudinit_config.users, null)
-  groups                 = try(var.cloudinit_config.groups, null)
-  ssh_authorized_keys    = try(var.cloudinit_config.ssh_authorized_keys, [])
-  files                  = try(var.cloudinit_config.files, {})
-  systemd_units          = try(var.cloudinit_config.systemd_units, [])
-  commands               = try(var.cloudinit_config.commands, [])
-  boot_commands          = try(var.cloudinit_config.boot_commands, [])
-  hostname               = try(var.cloudinit_config.hostname, null)
-  fqdn                   = try(var.cloudinit_config.fqdn, null)
-  preserve_hostname      = try(var.cloudinit_config.preserve_hostname, false)
-  timezone               = try(var.cloudinit_config.timezone, null)
-  mounts                 = try(var.cloudinit_config.mounts, [])
-  swap                   = try(var.cloudinit_config.swap, null)
-  growpart               = try(var.cloudinit_config.growpart, null)
-  resize_rootfs          = try(var.cloudinit_config.resize_rootfs, null)
-  disk_setup             = try(var.cloudinit_config.disk_setup, {})
-  fs_setup               = try(var.cloudinit_config.fs_setup, [])
-  device_aliases         = try(var.cloudinit_config.device_aliases, {})
-  ssh                    = try(var.cloudinit_config.ssh, null)
-  ssh_genkeytypes        = try(var.cloudinit_config.ssh_genkeytypes, null)
-  ssh_deletekeys         = try(var.cloudinit_config.ssh_deletekeys, null)
-  ca_certs               = try(var.cloudinit_config.ca_certs, null)
-  ntp                    = try(var.cloudinit_config.ntp, null)
-  apt                    = try(var.cloudinit_config.apt, null)
-  yum_repos              = try(var.cloudinit_config.yum_repos, {})
-  ansible_pull           = try(var.cloudinit_config.ansible_pull, [])
-  ansible_install_method = try(var.cloudinit_config.ansible_install_method, "distro")
-  power_state            = try(var.cloudinit_config.power_state, null)
-  phone_home             = try(var.cloudinit_config.phone_home, null)
-  rsyslog                = try(var.cloudinit_config.rsyslog, null)
-  artifacts              = try(var.cloudinit_config.artifacts, [])
-  ansible_playbooks      = try(var.cloudinit_config.ansible_playbooks, [])
-  ansible_core_install   = try(var.cloudinit_config.ansible_core_install, true)
-  execution_steps        = try(var.cloudinit_config.execution_steps, [])
+  cloud_config           = var.cloudinit_config.cloud_config
+  shell_scripts          = var.cloudinit_config.shell_scripts
+  cloudinit_parts        = var.cloudinit_config.cloudinit_parts
+  gzip                   = var.cloudinit_config.gzip
+  max_bytes              = var.cloudinit_config.max_bytes
+  scripts                = var.cloudinit_config.scripts
+  packages               = var.cloudinit_config.packages
+  users                  = var.cloudinit_config.users
+  groups                 = var.cloudinit_config.groups
+  ssh_authorized_keys    = var.cloudinit_config.ssh_authorized_keys
+  files                  = var.cloudinit_config.files
+  systemd_units          = var.cloudinit_config.systemd_units
+  secrets                = var.cloudinit_config.secrets
+  commands               = var.cloudinit_config.commands
+  boot_commands          = var.cloudinit_config.boot_commands
+  hostname               = var.cloudinit_config.hostname
+  fqdn                   = var.cloudinit_config.fqdn
+  preserve_hostname      = var.cloudinit_config.preserve_hostname
+  timezone               = var.cloudinit_config.timezone
+  mounts                 = var.cloudinit_config.mounts
+  swap                   = var.cloudinit_config.swap
+  growpart               = var.cloudinit_config.growpart
+  resize_rootfs          = var.cloudinit_config.resize_rootfs
+  disk_setup             = var.cloudinit_config.disk_setup
+  fs_setup               = var.cloudinit_config.fs_setup
+  device_aliases         = var.cloudinit_config.device_aliases
+  ssh                    = var.cloudinit_config.ssh
+  ssh_genkeytypes        = var.cloudinit_config.ssh_genkeytypes
+  ssh_deletekeys         = var.cloudinit_config.ssh_deletekeys
+  ca_certs               = var.cloudinit_config.ca_certs
+  ntp                    = var.cloudinit_config.ntp
+  apt                    = var.cloudinit_config.apt
+  yum_repos              = var.cloudinit_config.yum_repos
+  ansible_pull           = var.cloudinit_config.ansible_pull
+  ansible_install_method = var.cloudinit_config.ansible_install_method
+  power_state            = var.cloudinit_config.power_state
+  phone_home             = var.cloudinit_config.phone_home
+  rsyslog                = var.cloudinit_config.rsyslog
+  artifacts              = var.cloudinit_config.artifacts
+  ansible_playbooks      = var.cloudinit_config.ansible_playbooks
+  ansible_core_install   = var.cloudinit_config.ansible_core_install
+  execution_steps        = var.cloudinit_config.execution_steps
 }
 
 resource "aws_launch_template" "this" {
@@ -244,14 +246,18 @@ resource "aws_autoscaling_group" "this" {
   }
 
   dynamic "instance_refresh" {
-    for_each = var.instance_refresh != null ? [var.instance_refresh] : []
+    for_each = var.instance_refresh != null || var.instance_warmup != null ? [1] : []
     content {
-      strategy = instance_refresh.value.strategy
+      strategy = coalesce(try(var.instance_refresh.strategy, null), "Rolling")
 
       dynamic "preferences" {
-        for_each = instance_refresh.value.preferences != null ? [instance_refresh.value.preferences] : []
+        for_each = [merge(
+          var.instance_warmup != null ? { instance_warmup = var.instance_warmup } : {},
+          try(var.instance_refresh.preferences, {})
+        )]
         content {
           min_healthy_percentage = try(preferences.value.min_healthy_percentage, null)
+          instance_warmup        = try(preferences.value.instance_warmup, null)
         }
       }
     }
@@ -268,5 +274,27 @@ resource "aws_autoscaling_group" "this" {
 
   lifecycle {
     create_before_destroy = true
+
+    precondition {
+      condition     = var.min_size <= var.max_size
+      error_message = "min_size (${var.min_size}) must be <= max_size (${var.max_size})."
+    }
+    precondition {
+      condition     = var.desired_capacity == null || (var.desired_capacity >= var.min_size && var.desired_capacity <= var.max_size)
+      error_message = "desired_capacity (${coalesce(var.desired_capacity, "null")}) must be between min_size (${var.min_size}) and max_size (${var.max_size})."
+    }
   }
+}
+
+resource "aws_autoscaling_lifecycle_hook" "this" {
+  for_each = { for h in var.lifecycle_hooks : h.name => h }
+
+  name                    = each.value.name
+  autoscaling_group_name  = aws_autoscaling_group.this.name
+  lifecycle_transition    = each.value.lifecycle_transition
+  role_arn                = each.value.role_arn
+  notification_target_arn = each.value.notification_target_arn
+  notification_metadata   = each.value.notification_metadata
+  heartbeat_timeout       = each.value.heartbeat_timeout
+  default_result          = each.value.default_result
 }

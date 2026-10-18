@@ -25,9 +25,192 @@ variable "iam_instance_profile_name" {
 }
 
 variable "cloudinit_config" {
-  description = "Wildcard passthrough to every input of terraform-null-cloudinit (cloud_config, packages, users, files, mounts, ansible_pull, artifacts, ansible_playbooks, ...) - see that module's variables.tf for the full field set. This module never needs a new variable when that one gains a new helper; only this module's own main.tf gains one new try() line."
-  type        = any
-  default     = {}
+  description = "Typed pass-through to terraform-null-cloudinit. Every field mirrors that module's variables.tf exactly - see https://github.com/rafalmasiarek/terraform-null-cloudinit for full documentation."
+  type = object({
+    cloud_config  = optional(any)
+    shell_scripts = optional(list(string), [])
+    cloudinit_parts = optional(list(object({
+      content_type = string
+      content      = string
+      filename     = optional(string)
+      merge_type   = optional(string)
+    })), [])
+    gzip      = optional(bool, false)
+    max_bytes = optional(number, 16384)
+    scripts = optional(object({
+      per_boot     = optional(list(string), [])
+      per_instance = optional(list(string), [])
+      per_once     = optional(list(string), [])
+      boothook     = optional(list(string), [])
+    }), {})
+    packages = optional(object({
+      install            = optional(any, [])
+      update             = optional(bool, false)
+      upgrade            = optional(bool, false)
+      reboot_if_required = optional(bool, false)
+    }))
+    users = optional(list(object({
+      name                = string
+      gecos               = optional(string)
+      groups              = optional(list(string))
+      shell               = optional(string)
+      sudo                = optional(string)
+      lock_passwd         = optional(bool, true)
+      ssh_authorized_keys = optional(list(string))
+      ssh_import_id       = optional(list(string))
+      passwd              = optional(string)
+      hashed_passwd       = optional(string)
+      plain_text_passwd   = optional(string)
+      system              = optional(bool, false)
+      uid                 = optional(number)
+      primary_group       = optional(string)
+      homedir             = optional(string)
+      no_create_home      = optional(bool, false)
+      expiredate          = optional(string)
+      selinux_user        = optional(string)
+      extra               = optional(any, {})
+    })))
+    groups              = optional(map(list(string)))
+    ssh_authorized_keys = optional(list(string), [])
+    files = optional(map(object({
+      content     = optional(string, "")
+      owner       = optional(string, "root:root")
+      permissions = optional(string, "0644")
+      encoding    = optional(string, "text/plain")
+      append      = optional(bool, false)
+      defer       = optional(bool, false)
+      source_uri  = optional(string)
+    })), {})
+    systemd_units = optional(list(object({
+      name    = string
+      type    = optional(string, "service")
+      content = string
+      enabled = optional(bool, false)
+      dropins = optional(map(string), {})
+    })), [])
+    secrets = optional(list(object({
+      name        = string
+      destination = string
+      source_path = optional(string)
+      command     = optional(string)
+      owner       = optional(string)
+      permissions = optional(string, "0600")
+    })), [])
+    commands          = optional(any, [])
+    boot_commands     = optional(any, [])
+    hostname          = optional(string)
+    fqdn              = optional(string)
+    preserve_hostname = optional(bool, false)
+    timezone          = optional(string)
+    mounts            = optional(list(list(string)), [])
+    swap = optional(object({
+      filename = string
+      size     = optional(string, "auto")
+      maxsize  = optional(string)
+    }))
+    growpart = optional(object({
+      mode                     = optional(string, "auto")
+      devices                  = optional(list(string), ["/"])
+      ignore_growroot_disabled = optional(bool, false)
+    }))
+    resize_rootfs = optional(string)
+    disk_setup = optional(map(object({
+      table_type = optional(string, "mbr")
+      layout     = optional(any, false)
+      overwrite  = optional(bool, false)
+    })), {})
+    fs_setup = optional(list(object({
+      label      = optional(string)
+      filesystem = string
+      device     = string
+      partition  = optional(string)
+      overwrite  = optional(bool, false)
+      extra_opts = optional(list(string), [])
+    })), [])
+    device_aliases = optional(map(string), {})
+    ssh = optional(object({
+      enabled              = optional(bool, true)
+      emit_keys_to_console = optional(bool, true)
+    }))
+    ssh_genkeytypes = optional(list(string))
+    ssh_deletekeys  = optional(bool)
+    ca_certs = optional(object({
+      trusted         = optional(list(string), [])
+      remove_defaults = optional(bool, false)
+    }))
+    ntp = optional(object({
+      enabled    = optional(bool, true)
+      ntp_client = optional(string)
+      pools      = optional(list(string), [])
+      servers    = optional(list(string), [])
+    }))
+    apt = optional(object({
+      preserve_sources_list = optional(bool)
+      disable_suites        = optional(list(string), [])
+      sources = optional(map(object({
+        source    = string
+        keyid     = optional(string)
+        key       = optional(string)
+        keyserver = optional(string)
+      })), {})
+    }))
+    yum_repos = optional(map(object({
+      baseurl = optional(string)
+      extra   = optional(any, {})
+    })), {})
+    ansible_pull = optional(list(object({
+      url             = string
+      playbook_names  = list(string)
+      checkout        = optional(string)
+      accept_host_key = optional(bool, true)
+      full            = optional(bool)
+      clean           = optional(bool)
+      timeout         = optional(number)
+    })), [])
+    ansible_install_method = optional(string, "distro")
+    power_state = optional(object({
+      mode      = string
+      delay     = optional(string, "now")
+      message   = optional(string)
+      timeout   = optional(number, 30)
+      condition = optional(string, "true")
+    }))
+    phone_home = optional(object({
+      url   = string
+      post  = optional(list(string), ["instance_id", "hostname", "fqdn"])
+      tries = optional(number, 10)
+    }))
+    rsyslog = optional(object({
+      configs = optional(list(string), [])
+      remotes = optional(map(string), {})
+    }))
+    artifacts = optional(list(object({
+      source       = string
+      destination  = string
+      owner        = optional(string)
+      permissions  = optional(string)
+      sha256       = optional(string)
+      region       = optional(string)
+      endpoint_url = optional(string)
+      extract      = optional(bool, false)
+      extract_to   = optional(string)
+    })), [])
+    ansible_playbooks = optional(list(object({
+      path       = string
+      inventory  = optional(string, "localhost,")
+      connection = optional(string, "local")
+      extra_vars = optional(map(string), {})
+      tags       = optional(list(string), [])
+      become     = optional(bool, true)
+    })), [])
+    ansible_core_install = optional(bool, true)
+    execution_steps = optional(list(object({
+      command = string
+      cwd     = optional(string)
+      env     = optional(map(string), {})
+    })), [])
+  })
+  default = {}
 }
 
 variable "ebs_optimized" {
@@ -72,6 +255,19 @@ variable "metadata_options" {
     http_put_response_hop_limit = optional(number, 2)
   })
   default = {}
+
+  validation {
+    condition     = contains(["enabled", "disabled"], var.metadata_options.http_endpoint)
+    error_message = "metadata_options.http_endpoint must be \"enabled\" or \"disabled\"."
+  }
+  validation {
+    condition     = contains(["optional", "required"], var.metadata_options.http_tokens)
+    error_message = "metadata_options.http_tokens must be \"optional\" or \"required\" (IMDSv2)."
+  }
+  validation {
+    condition     = var.metadata_options.http_put_response_hop_limit >= 1 && var.metadata_options.http_put_response_hop_limit <= 64
+    error_message = "metadata_options.http_put_response_hop_limit must be between 1 and 64."
+  }
 }
 
 variable "block_device_mappings" {
@@ -167,10 +363,18 @@ variable "vpc_security_group_ids" {
 
 variable "min_size" {
   type = number
+  validation {
+    condition     = var.min_size >= 0
+    error_message = "min_size must be >= 0."
+  }
 }
 
 variable "max_size" {
   type = number
+  validation {
+    condition     = var.max_size >= 1
+    error_message = "max_size must be >= 1."
+  }
 }
 
 variable "desired_capacity" {
@@ -227,9 +431,35 @@ variable "instance_refresh" {
     strategy = string
     preferences = optional(object({
       min_healthy_percentage = optional(number)
+      instance_warmup        = optional(number)
     }))
   })
   default = null
+}
+
+variable "instance_warmup" {
+  description = "Shorthand: sets instance_refresh.preferences.instance_warmup without requiring the full instance_refresh block. Ignored if instance_refresh.preferences.instance_warmup is set explicitly."
+  type        = number
+  default     = null
+}
+
+variable "lifecycle_hooks" {
+  description = "ASG lifecycle hooks. Each entry creates one aws_autoscaling_lifecycle_hook."
+  type = list(object({
+    name                    = string
+    lifecycle_transition    = optional(string, "autoscaling:EC2_INSTANCE_LAUNCHING")
+    role_arn                = optional(string)
+    notification_target_arn = optional(string)
+    notification_metadata   = optional(string)
+    heartbeat_timeout       = optional(number, 300)
+    default_result          = optional(string, "CONTINUE")
+  }))
+  default = []
+
+  validation {
+    condition     = alltrue([for h in var.lifecycle_hooks : contains(["autoscaling:EC2_INSTANCE_LAUNCHING", "autoscaling:EC2_INSTANCE_LAUNCH_COMPLETE", "autoscaling:EC2_INSTANCE_TERMINATING", "autoscaling:EC2_INSTANCE_TERMINATE", "autoscaling:TEST_INSTANCE"], h.lifecycle_transition)])
+    error_message = "lifecycle_hooks[].lifecycle_transition must be a valid ASG lifecycle transition (e.g. autoscaling:EC2_INSTANCE_LAUNCHING)."
+  }
 }
 
 variable "autoscaling_group_tags" {

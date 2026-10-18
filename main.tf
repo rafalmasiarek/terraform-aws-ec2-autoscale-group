@@ -248,7 +248,7 @@ resource "aws_autoscaling_group" "this" {
   dynamic "instance_refresh" {
     for_each = var.instance_refresh != null || var.instance_warmup != null ? [1] : []
     content {
-      strategy = coalesce(try(var.instance_refresh.strategy, null), "rolling")
+      strategy = coalesce(try(var.instance_refresh.strategy, null), "Rolling")
 
       dynamic "preferences" {
         for_each = [merge(

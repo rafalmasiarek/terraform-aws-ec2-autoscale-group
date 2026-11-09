@@ -34,6 +34,7 @@ module "nodes" {
 | `key_name` | `string` | `null` | |
 | `iam_instance_profile_name` | `string` | `null` | Name of an existing IAM instance profile. No profile attached if `null`. |
 | `cloudinit_config` | `any` | `{}` | Wildcard passthrough to every input of [terraform-null-cloudinit](https://github.com/rafalmasiarek/terraform-null-cloudinit) (`cloud_config`, `packages`, `users`, `files`, `mounts`, `ansible_pull`, `artifacts`, `ansible_playbooks`, ...) - see that module's README for the full field set. |
+| `identity` | `object` | `{mode = "none"}` | Instance naming strategy: `mode = "none"` (default, no change in behavior), `"aws_native"` (launch template's private DNS hostname), `"static"` (feeds `identity.static.hostname`/`fqdn` into CloudInit), `"custom_runtime"` (per-instance hostname generated at boot from a template + IMDSv2). See [Instance identity](#instance-identity). |
 | `ebs_optimized` | `bool` | `null` | |
 | `disable_api_termination` | `bool` | `null` | |
 | `instance_initiated_shutdown_behavior` | `string` | `null` | `"stop"` or `"terminate"`. |
@@ -83,6 +84,59 @@ module "nodes" {
 ## Public IP in a public subnet
 
 `associate_public_ip_address` always goes through a single `network_interfaces` block rather than the launch template's flat `vpc_security_group_ids` attribute - that combination has a long-standing AWS provider quirk ([terraform-provider-aws#4570](https://github.com/hashicorp/terraform-provider-aws/issues/4570)) where `associate_public_ip_address` doesn't reliably apply otherwise. Set `network_interfaces` yourself only for advanced cases (e.g. multiple ENIs) - it fully overrides `vpc_security_group_ids`/`associate_public_ip_address` when set.
+
+## Instance identity
+
+`identity.mode` picks which component owns an instance's hostname/DNS - exactly one authority per mode, enforced by a precondition so two mechanisms never fight over the same name:
+
+- **`"none"`** (default) - no change. Use `cloudinit_config.hostname`/`fqdn`/`preserve_hostname` directly, as before.
+- **`"aws_native"`** - configures the launch template's `private_dns_name_options` (an AWS EC2/VPC feature, not CloudInit): `hostname_type` (`"ip-name"` or `"resource-name"`), `enable_resource_name_dns_a_record`, `enable_resource_name_dns_aaaa_record`. Recommended for AWS-native environments - no bootstrap script needed. Setting `cloudinit_config.hostname` at the same time is rejected.
+
+  ```hcl
+  identity = {
+    mode = "aws_native"
+    aws_native = {
+      hostname_type                     = "resource-name"
+      enable_resource_name_dns_a_record = true
+    }
+  }
+  ```
+
+- **`"static"`** - for a single, fixed-identity instance (e.g. a standalone database box). Equivalent to setting `cloudinit_config.hostname`/`fqdn` directly - `identity.mode` just documents that choice explicitly. Setting `cloudinit_config.hostname` at the same time is rejected.
+
+  ```hcl
+  identity = {
+    mode = "static"
+    static = {
+      hostname = "db-production-01"
+      fqdn     = "db-production-01.internal.example.com"
+    }
+  }
+  ```
+
+- **`"custom_runtime"`** - per-instance hostname generated at boot, for naming conventions AWS-native naming doesn't cover. Safe for any ASG size - each instance computes its own hostname independently. `hostname_template` mixes two kinds of `{token}`: static ones resolved at `terraform plan` from `identity.custom_runtime.variables` (e.g. `service`, `environment`), and runtime ones resolved at boot from IMDSv2 - `instance_id`, `private_ipv4`, `private_ipv6`, `availability_zone`, `region`. Only the runtime tokens actually referenced are queried - the bootstrap script never fetches metadata the template doesn't use. Requires `metadata_options.http_tokens = "required"` (the module's own default).
+
+  ```hcl
+  identity = {
+    mode = "custom_runtime"
+    custom_runtime = {
+      hostname_template = "{service}-{environment}-{instance_id}"
+      domain             = "internal.example.com"
+      variables = {
+        service     = "api"
+        environment = "production"
+      }
+    }
+  }
+  ```
+
+  The generated hostname is lowercased, stripped to `[a-z0-9-]`, and truncated to 63 characters (DNS label limit) if needed - preserving uniqueness via a stable suffix from the tail of the truncated value rather than a naive cut. If a referenced runtime value can't be fetched (e.g. `private_ipv6` on an IPv4-only instance), the bootstrap script logs to `/var/log/identity-bootstrap.log` and skips hostname-setting entirely rather than applying a broken or partial name. `domain`, if set, only adds a local `/etc/hosts` entry for the FQDN - never a real DNS record (see below).
+
+  This mode calls `hostnamectl set-hostname` directly rather than going through CloudInit's own `hostname`/`fqdn` handling, since that mechanism only accepts a literal string known when `user_data` is rendered - it has no way to query IMDS itself. Assumes a systemd-based AMI (Amazon Linux 2023, Ubuntu, RHEL9, and similar) - if `hostnamectl` isn't present, the failure is logged and the instance keeps whatever hostname it already had.
+
+There is no public-hostname equivalent to configure: AWS has no per-instance "public hostname type" setting at the launch-template level. Public DNS resolution of an instance is governed entirely by the VPC's `enable_dns_hostnames` (see [terraform-aws-vpc](https://github.com/rafalmasiarek/terraform-aws-vpc)) and whether the instance has a public IP, which is already controlled by `associate_public_ip_address`/`network_interfaces` above.
+
+This module never creates DNS records, PTR entries, or service-discovery registrations for individual instances - an ASG's instances are replaced outside of any `terraform apply`, so per-instance DNS is an external DNS mechanism's responsibility, not this module's.
 
 ## User data
 

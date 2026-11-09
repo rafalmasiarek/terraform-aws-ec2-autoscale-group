@@ -213,6 +213,71 @@ variable "cloudinit_config" {
   default = {}
 }
 
+variable "identity" {
+  description = "Instance identity strategy. mode = \"none\" (default) changes nothing - use cloudinit_config.hostname/fqdn directly as before. \"aws_native\" configures the launch template's private DNS hostname (AWS EC2/VPC feature, no CloudInit involved). \"static\" is equivalent to \"none\" for a single fixed hostname/fqdn, kept separate so identity.mode is the one place that documents which authority owns naming. \"custom_runtime\" generates a per-instance hostname at boot, via a bootstrap script querying IMDSv2 - the only mode safe for a scaling group that needs its own naming convention instead of aws_native."
+  type = object({
+    mode = optional(string, "none") # "none" | "aws_native" | "static" | "custom_runtime"
+
+    aws_native = optional(object({
+      hostname_type                        = string # "ip-name" | "resource-name"
+      enable_resource_name_dns_a_record    = optional(bool, false)
+      enable_resource_name_dns_aaaa_record = optional(bool, false)
+    }))
+
+    static = optional(object({
+      hostname = string
+      fqdn     = optional(string)
+    }))
+
+    custom_runtime = optional(object({
+      hostname_template = string                    # e.g. "{service}-{environment}-{instance_id}"
+      domain            = optional(string)          # for FQDN construction - local /etc/hosts entry only, never real DNS registration
+      variables         = optional(map(string), {}) # static substitutions, known at plan time: service, environment, role, ...
+    }))
+  })
+  default = {}
+
+  validation {
+    condition     = contains(["none", "aws_native", "static", "custom_runtime"], var.identity.mode)
+    error_message = "identity.mode must be one of: none, aws_native, static, custom_runtime."
+  }
+  validation {
+    condition     = var.identity.mode != "aws_native" || var.identity.aws_native != null
+    error_message = "identity.mode = \"aws_native\" requires identity.aws_native to be set."
+  }
+  validation {
+    condition     = var.identity.aws_native == null || contains(["ip-name", "resource-name"], var.identity.aws_native.hostname_type)
+    error_message = "identity.aws_native.hostname_type must be \"ip-name\" or \"resource-name\"."
+  }
+  validation {
+    condition     = var.identity.mode != "static" || var.identity.static != null
+    error_message = "identity.mode = \"static\" requires identity.static to be set."
+  }
+  validation {
+    condition     = var.identity.mode != "custom_runtime" || var.identity.custom_runtime != null
+    error_message = "identity.mode = \"custom_runtime\" requires identity.custom_runtime to be set."
+  }
+  validation {
+    # Every {token} in hostname_template must be either a known runtime token
+    # (resolved at boot from IMDSv2) or a key the caller supplied in
+    # identity.custom_runtime.variables (resolved at plan time) - anything
+    # else is a typo that would otherwise silently leave a literal "{foo}"
+    # in the generated hostname.
+    condition = var.identity.custom_runtime == null || alltrue([
+      for t in flatten(regexall("\\{([a-z_]+)\\}", var.identity.custom_runtime.hostname_template)) :
+      contains(concat(
+        ["instance_id", "private_ipv4", "private_ipv6", "availability_zone", "region"],
+        keys(var.identity.custom_runtime.variables)
+      ), t)
+    ])
+    error_message = "identity.custom_runtime.hostname_template references an unknown {token} - must be one of instance_id, private_ipv4, private_ipv6, availability_zone, region, or a key present in identity.custom_runtime.variables."
+  }
+  validation {
+    condition = var.identity.custom_runtime == null || try(var.identity.custom_runtime.domain, null) == null || provider::netutils::fqdn_validate(var.identity.custom_runtime.domain)
+    error_message = "identity.custom_runtime.domain must be a valid domain name (RFC 1123 labels, max 253 characters)."
+  }
+}
+
 variable "ebs_optimized" {
   type    = bool
   default = null

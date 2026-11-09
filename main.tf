@@ -30,6 +30,50 @@ locals {
   }]
 
   network_interfaces = length(var.network_interfaces) > 0 ? var.network_interfaces : local.default_network_interfaces
+
+  # identity.mode = "static" feeds the same cloudinit hostname/fqdn knobs
+  # the module already had - it's not a new naming authority, just the
+  # one place that documents who owns naming for this launch template.
+  cloudinit_hostname = var.identity.mode == "static" ? var.identity.static.hostname : var.cloudinit_config.hostname
+  cloudinit_fqdn     = var.identity.mode == "static" ? var.identity.static.fqdn : var.cloudinit_config.fqdn
+
+  # --- identity.mode = "custom_runtime" ---
+
+  _identity_runtime_token_names = ["instance_id", "private_ipv4", "private_ipv6", "availability_zone", "region"]
+
+  # Runtime tokens ({instance_id}, ...) are left untouched here - the
+  # bootstrap script fills those in at boot, from IMDSv2. Only tokens the
+  # caller defined in identity.custom_runtime.variables are substituted
+  # now, at plan time. Splitting the template into "{token}" vs. literal
+  # runs and trimming the braces off each piece is a no-op for literal
+  # runs (trimprefix/trimsuffix only strip when present), so the same
+  # expression handles both without a separate branch.
+  _identity_template_parts = var.identity.mode == "custom_runtime" ? regexall("\\{[a-zA-Z0-9_]+\\}|[^{}]+", var.identity.custom_runtime.hostname_template) : []
+
+  identity_hostname_prefix_template = var.identity.mode == "custom_runtime" ? join("", [
+    for part in local._identity_template_parts :
+    contains(keys(var.identity.custom_runtime.variables), trimsuffix(trimprefix(part, "{"), "}"))
+    ? var.identity.custom_runtime.variables[trimsuffix(trimprefix(part, "{"), "}")]
+    : part
+  ]) : null
+
+  # Only fetch the IMDSv2 metadata the configured template actually needs.
+  identity_runtime_tokens_used = var.identity.mode == "custom_runtime" ? [
+    for t in local._identity_runtime_token_names :
+    t if can(regex("\\{${t}\\}", var.identity.custom_runtime.hostname_template))
+  ] : []
+
+  identity_bootstrap_script = var.identity.mode == "custom_runtime" ? templatefile("${path.module}/templates/identity_bootstrap.sh.tftpl", {
+    hostname_prefix_template = local.identity_hostname_prefix_template
+    domain                   = try(var.identity.custom_runtime.domain, "")
+    use_instance_id          = contains(local.identity_runtime_tokens_used, "instance_id")
+    use_private_ipv4         = contains(local.identity_runtime_tokens_used, "private_ipv4")
+    use_private_ipv6         = contains(local.identity_runtime_tokens_used, "private_ipv6")
+    use_availability_zone    = contains(local.identity_runtime_tokens_used, "availability_zone")
+    use_region               = contains(local.identity_runtime_tokens_used, "region")
+  }) : null
+
+  cloudinit_shell_scripts = var.identity.mode == "custom_runtime" ? concat(var.cloudinit_config.shell_scripts, [local.identity_bootstrap_script]) : var.cloudinit_config.shell_scripts
 }
 
 module "cloudinit" {
@@ -37,7 +81,7 @@ module "cloudinit" {
   version = "~> 0.2.0"
 
   cloud_config           = var.cloudinit_config.cloud_config
-  shell_scripts          = var.cloudinit_config.shell_scripts
+  shell_scripts          = local.cloudinit_shell_scripts
   cloudinit_parts        = var.cloudinit_config.cloudinit_parts
   gzip                   = var.cloudinit_config.gzip
   max_bytes              = var.cloudinit_config.max_bytes
@@ -51,8 +95,8 @@ module "cloudinit" {
   secrets                = var.cloudinit_config.secrets
   commands               = var.cloudinit_config.commands
   boot_commands          = var.cloudinit_config.boot_commands
-  hostname               = var.cloudinit_config.hostname
-  fqdn                   = var.cloudinit_config.fqdn
+  hostname               = local.cloudinit_hostname
+  fqdn                   = local.cloudinit_fqdn
   preserve_hostname      = var.cloudinit_config.preserve_hostname
   timezone               = var.cloudinit_config.timezone
   mounts                 = var.cloudinit_config.mounts
@@ -169,6 +213,15 @@ resource "aws_launch_template" "this" {
     }
   }
 
+  dynamic "private_dns_name_options" {
+    for_each = var.identity.mode == "aws_native" ? [var.identity.aws_native] : []
+    content {
+      hostname_type                        = private_dns_name_options.value.hostname_type
+      enable_resource_name_dns_a_record    = private_dns_name_options.value.enable_resource_name_dns_a_record
+      enable_resource_name_dns_aaaa_record = private_dns_name_options.value.enable_resource_name_dns_aaaa_record
+    }
+  }
+
   dynamic "network_interfaces" {
     for_each = local.network_interfaces
     content {
@@ -193,6 +246,19 @@ resource "aws_launch_template" "this" {
 
   lifecycle {
     create_before_destroy = true
+
+    precondition {
+      # Exactly one authority owns hostname - identity.mode, once it's
+      # anything other than "none", or cloudinit_config.hostname directly,
+      # never both. Checked once for all three active modes instead of a
+      # separate precondition per mode, since the rule is identical.
+      condition     = var.identity.mode == "none" || var.cloudinit_config.hostname == null
+      error_message = "identity.mode = \"${var.identity.mode}\" owns hostname - cloudinit_config.hostname would compete with it. Set hostname only through identity.*, not both."
+    }
+    precondition {
+      condition     = var.identity.mode != "custom_runtime" || var.metadata_options.http_tokens == "required"
+      error_message = "identity.mode = \"custom_runtime\" queries IMDSv2 in its bootstrap script - metadata_options.http_tokens must be \"required\"."
+    }
   }
 }
 
@@ -282,6 +348,13 @@ resource "aws_autoscaling_group" "this" {
     precondition {
       condition     = var.desired_capacity == null || (var.desired_capacity >= var.min_size && var.desired_capacity <= var.max_size)
       error_message = "desired_capacity (${coalesce(var.desired_capacity, "null")}) must be between min_size (${var.min_size}) and max_size (${var.max_size})."
+    }
+    precondition {
+      # identity.mode = "static" bakes one fixed hostname/fqdn into every
+      # instance launched from this template - safe only when there can
+      # never be more than one at a time.
+      condition     = var.identity.mode != "static" || var.max_size <= 1
+      error_message = "identity.mode = \"static\" assigns the same hostname/fqdn to every instance - only safe when max_size <= 1. Use \"aws_native\" or \"custom_runtime\" for a scaling group."
     }
   }
 }

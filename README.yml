@@ -1,0 +1,18 @@
+name: terraform-aws-ec2-autoscale-group
+repo_url: https://github.com/rafalmasiarek/terraform-aws-ec2-autoscale-group
+license: MIT
+
+context:
+  - "## About"
+  - |
+    Generic Terraform module for an EC2 launch template + Auto Scaling Group. No knowledge of any particular AWS service that might run on top (ECS, EKS, or anything else) - all configuration comes from the caller, including the AMI (no internal `data "aws_ami"` lookup deciding anything on your behalf).
+
+includes:
+  - docs/usage.md
+  - docs/terraform.md
+
+authors:
+  - name: Rafał Masiarek
+    email: rafal@masiarek.pl
+    github: rafalmasiarek
+    website: https://masiarek.pl

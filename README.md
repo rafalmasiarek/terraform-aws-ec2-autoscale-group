@@ -5,28 +5,6 @@ Generic Terraform module for an EC2 launch template + Auto Scaling Group. No kno
 
 
 
-## License
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-```text
-The MIT License (MIT)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files, to deal in the Software
-without restriction.
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
-
-Source: https://opensource.org/licenses/MIT
-```
-See [LICENSE](LICENSE) for full details.
-## Authors
-
-- Rafał Masiarek | [website](https://masiarek.pl) | [email](mailto:rafal@masiarek.pl) | [github](https://github.com/rafalmasiarek)
-
 
 ## Usage
 
@@ -72,7 +50,8 @@ See that module's README for the full catalog (packages, users, files, mounts, a
 Both the launch template and the ASG share one tagger entry (`terraform-null-tagger`'s `autoscaling_group` service category: `min_size`, `max_size`). CPU alarms, if enabled, carry the same tags. Set `use_tagger = false` to bypass this and apply `var.tags` directly instead.
 
 
-<!-- BEGIN_TF_DOCS -->
+## Terraform Reference
+
 
 
 ### Requirements
@@ -163,7 +142,31 @@ Both the launch template and the ASG share one tagger entry (`terraform-null-tag
 | <a name="output_cloudinit_required_permissions"></a> [cloudinit\_required\_permissions](#output\_cloudinit\_required\_permissions) | IAM permissions required by cloud-init artifacts (S3, etc.). Attach to your instance role. Null values mean that provider's scheme is not used. |
 | <a name="output_launch_template_id"></a> [launch\_template\_id](#output\_launch\_template\_id) | n/a |
 | <a name="output_launch_template_latest_version"></a> [launch\_template\_latest\_version](#output\_launch\_template\_latest\_version) | n/a |
-<!-- END_TF_DOCS -->
+
+## License
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+```text
+The MIT License (MIT)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files, to deal in the Software
+without restriction.
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+
+Source: https://opensource.org/licenses/MIT
+```
+
+
+See [LICENSE](LICENSE) for full details.
+## Authors
+
+- Rafał Masiarek | [website](https://masiarek.pl) | [email](mailto:rafal@masiarek.pl) | [github](https://github.com/rafalmasiarek)
 
 
 <!-- references -->

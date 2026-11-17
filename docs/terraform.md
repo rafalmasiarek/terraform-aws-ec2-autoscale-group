@@ -1,4 +1,5 @@
-<!-- BEGIN_TF_DOCS -->
+## Terraform Reference
+
 
 
 ### Requirements
@@ -89,4 +90,3 @@
 | <a name="output_cloudinit_required_permissions"></a> [cloudinit\_required\_permissions](#output\_cloudinit\_required\_permissions) | IAM permissions required by cloud-init artifacts (S3, etc.). Attach to your instance role. Null values mean that provider's scheme is not used. |
 | <a name="output_launch_template_id"></a> [launch\_template\_id](#output\_launch\_template\_id) | n/a |
 | <a name="output_launch_template_latest_version"></a> [launch\_template\_latest\_version](#output\_launch\_template\_latest\_version) | n/a |
-<!-- END_TF_DOCS -->

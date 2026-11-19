@@ -6,7 +6,7 @@
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.8.5 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 6.0 |
 | <a name="requirement_tagger"></a> [tagger](#requirement\_tagger) | >= 0.1.0 |
 
@@ -52,6 +52,7 @@
 | <a name="input_health_check_grace_period"></a> [health\_check\_grace\_period](#input\_health\_check\_grace\_period) | n/a | `number` | `null` | no |
 | <a name="input_health_check_type"></a> [health\_check\_type](#input\_health\_check\_type) | n/a | `string` | `"EC2"` | no |
 | <a name="input_iam_instance_profile_name"></a> [iam\_instance\_profile\_name](#input\_iam\_instance\_profile\_name) | Name of an existing IAM instance profile. No instance profile attached if null. | `string` | `null` | no |
+| <a name="input_identity"></a> [identity](#input\_identity) | Instance identity strategy. mode = "none" (default) changes nothing - use cloudinit\_config.hostname/fqdn directly as before. "aws\_native" configures the launch template's private DNS hostname (AWS EC2/VPC feature, no CloudInit involved). "static" is equivalent to "none" for a single fixed hostname/fqdn, kept separate so identity.mode is the one place that documents which authority owns naming. "custom\_runtime" generates a per-instance hostname at boot, via a bootstrap script querying IMDSv2 - the only mode safe for a scaling group that needs its own naming convention instead of aws\_native. | <pre>object({<br/>    mode = optional(string, "none") # "none" | "aws_native" | "static" | "custom_runtime"<br/><br/>    aws_native = optional(object({<br/>      hostname_type                        = string # "ip-name" | "resource-name"<br/>      enable_resource_name_dns_a_record    = optional(bool, false)<br/>      enable_resource_name_dns_aaaa_record = optional(bool, false)<br/>    }))<br/><br/>    static = optional(object({<br/>      hostname = string<br/>      fqdn     = optional(string)<br/>    }))<br/><br/>    custom_runtime = optional(object({<br/>      hostname_template = string                    # e.g. "{service}-{environment}-{instance_id}"<br/>      domain            = optional(string)          # for FQDN construction - local /etc/hosts entry only, never real DNS registration<br/>      variables         = optional(map(string), {}) # static substitutions, known at plan time: service, environment, role, ...<br/>    }))<br/>  })</pre> | `{}` | no |
 | <a name="input_instance_initiated_shutdown_behavior"></a> [instance\_initiated\_shutdown\_behavior](#input\_instance\_initiated\_shutdown\_behavior) | "stop" or "terminate". | `string` | `null` | no |
 | <a name="input_instance_refresh"></a> [instance\_refresh](#input\_instance\_refresh) | n/a | <pre>object({<br/>    strategy = string<br/>    preferences = optional(object({<br/>      min_healthy_percentage = optional(number)<br/>      instance_warmup        = optional(number)<br/>    }))<br/>  })</pre> | `null` | no |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | Default instance type. Ignored per-override if mixed\_instances\_policy sets its own overrides. | `string` | n/a | yes |

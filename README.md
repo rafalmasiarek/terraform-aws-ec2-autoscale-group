@@ -1,7 +1,17 @@
 # terraform-aws-ec2-autoscale-group
+
+
+
+
+
+
+
+
 ## About
 
 Generic Terraform module for an EC2 launch template + Auto Scaling Group. No knowledge of any particular AWS service that might run on top (ECS, EKS, or anything else) - all configuration comes from the caller, including the AMI (no internal `data "aws_ami"` lookup deciding anything on your behalf).
+
+
 
 
 
@@ -33,59 +43,6 @@ module "nodes" {
 
 `associate_public_ip_address` always goes through a single `network_interfaces` block rather than the launch template's flat `vpc_security_group_ids` attribute - that combination has a long-standing AWS provider quirk ([terraform-provider-aws#4570](https://github.com/hashicorp/terraform-provider-aws/issues/4570)) where `associate_public_ip_address` doesn't reliably apply otherwise. Set `network_interfaces` yourself only for advanced cases (e.g. multiple ENIs) - it fully overrides `vpc_security_group_ids`/`associate_public_ip_address` when set.
 
-## Instance identity
-
-`identity.mode` picks which component owns an instance's hostname/DNS - exactly one authority per mode, enforced by a precondition so two mechanisms never fight over the same name:
-
-- **`"none"`** (default) - no change. Use `cloudinit_config.hostname`/`fqdn`/`preserve_hostname` directly, as before.
-- **`"aws_native"`** - configures the launch template's `private_dns_name_options` (an AWS EC2/VPC feature, not CloudInit): `hostname_type` (`"ip-name"` or `"resource-name"`), `enable_resource_name_dns_a_record`, `enable_resource_name_dns_aaaa_record`. Recommended for AWS-native environments - no bootstrap script needed. Setting `cloudinit_config.hostname` at the same time is rejected.
-
-  ```hcl
-  identity = {
-    mode = "aws_native"
-    aws_native = {
-      hostname_type                     = "resource-name"
-      enable_resource_name_dns_a_record = true
-    }
-  }
-  ```
-
-- **`"static"`** - for a single, fixed-identity instance (e.g. a standalone database box). Equivalent to setting `cloudinit_config.hostname`/`fqdn` directly - `identity.mode` just documents that choice explicitly. Setting `cloudinit_config.hostname` at the same time is rejected.
-
-  ```hcl
-  identity = {
-    mode = "static"
-    static = {
-      hostname = "db-production-01"
-      fqdn     = "db-production-01.internal.example.com"
-    }
-  }
-  ```
-
-- **`"custom_runtime"`** - per-instance hostname generated at boot, for naming conventions AWS-native naming doesn't cover. Safe for any ASG size - each instance computes its own hostname independently. `hostname_template` mixes two kinds of `{token}`: static ones resolved at `terraform plan` from `identity.custom_runtime.variables` (e.g. `service`, `environment`), and runtime ones resolved at boot from IMDSv2 - `instance_id`, `private_ipv4`, `private_ipv6`, `availability_zone`, `region`. Only the runtime tokens actually referenced are queried - the bootstrap script never fetches metadata the template doesn't use. Requires `metadata_options.http_tokens = "required"` (the module's own default).
-
-  ```hcl
-  identity = {
-    mode = "custom_runtime"
-    custom_runtime = {
-      hostname_template = "{service}-{environment}-{instance_id}"
-      domain             = "internal.example.com"
-      variables = {
-        service     = "api"
-        environment = "production"
-      }
-    }
-  }
-  ```
-
-  The generated hostname is lowercased, stripped to `[a-z0-9-]`, and truncated to 63 characters (DNS label limit) if needed - preserving uniqueness via a stable suffix from the tail of the truncated value rather than a naive cut. If a referenced runtime value can't be fetched (e.g. `private_ipv6` on an IPv4-only instance), the bootstrap script logs to `/var/log/identity-bootstrap.log` and skips hostname-setting entirely rather than applying a broken or partial name. `domain`, if set, only adds a local `/etc/hosts` entry for the FQDN - never a real DNS record (see below).
-
-  This mode calls `hostnamectl set-hostname` directly rather than going through CloudInit's own `hostname`/`fqdn` handling, since that mechanism only accepts a literal string known when `user_data` is rendered - it has no way to query IMDS itself. Assumes a systemd-based AMI (Amazon Linux 2023, Ubuntu, RHEL9, and similar) - if `hostnamectl` isn't present, the failure is logged and the instance keeps whatever hostname it already had.
-
-There is no public-hostname equivalent to configure: AWS has no per-instance "public hostname type" setting at the launch-template level. Public DNS resolution of an instance is governed entirely by the VPC's `enable_dns_hostnames` (see [terraform-aws-vpc](https://github.com/rafalmasiarek/terraform-aws-vpc)) and whether the instance has a public IP, which is already controlled by `associate_public_ip_address`/`network_interfaces` above.
-
-This module never creates DNS records, PTR entries, or service-discovery registrations for individual instances - an ASG's instances are replaced outside of any `terraform apply`, so per-instance DNS is an external DNS mechanism's responsibility, not this module's.
-
 ## User data
 
 `cloudinit_config` is a single wildcard object forwarded as-is into every input of [terraform-null-cloudinit](https://github.com/rafalmasiarek/terraform-null-cloudinit) - this module never needs a new variable when that one gains a new helper, only one new `try()` line in its own `main.tf`. A plain shell script is just:
@@ -111,7 +68,7 @@ Both the launch template and the ASG share one tagger entry (`terraform-null-tag
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.8.5 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 6.0 |
 | <a name="requirement_tagger"></a> [tagger](#requirement\_tagger) | >= 0.1.0 |
 
@@ -157,6 +114,7 @@ Both the launch template and the ASG share one tagger entry (`terraform-null-tag
 | <a name="input_health_check_grace_period"></a> [health\_check\_grace\_period](#input\_health\_check\_grace\_period) | n/a | `number` | `null` | no |
 | <a name="input_health_check_type"></a> [health\_check\_type](#input\_health\_check\_type) | n/a | `string` | `"EC2"` | no |
 | <a name="input_iam_instance_profile_name"></a> [iam\_instance\_profile\_name](#input\_iam\_instance\_profile\_name) | Name of an existing IAM instance profile. No instance profile attached if null. | `string` | `null` | no |
+| <a name="input_identity"></a> [identity](#input\_identity) | Instance identity strategy. mode = "none" (default) changes nothing - use cloudinit\_config.hostname/fqdn directly as before. "aws\_native" configures the launch template's private DNS hostname (AWS EC2/VPC feature, no CloudInit involved). "static" is equivalent to "none" for a single fixed hostname/fqdn, kept separate so identity.mode is the one place that documents which authority owns naming. "custom\_runtime" generates a per-instance hostname at boot, via a bootstrap script querying IMDSv2 - the only mode safe for a scaling group that needs its own naming convention instead of aws\_native. | <pre>object({<br/>    mode = optional(string, "none") # "none" | "aws_native" | "static" | "custom_runtime"<br/><br/>    aws_native = optional(object({<br/>      hostname_type                        = string # "ip-name" | "resource-name"<br/>      enable_resource_name_dns_a_record    = optional(bool, false)<br/>      enable_resource_name_dns_aaaa_record = optional(bool, false)<br/>    }))<br/><br/>    static = optional(object({<br/>      hostname = string<br/>      fqdn     = optional(string)<br/>    }))<br/><br/>    custom_runtime = optional(object({<br/>      hostname_template = string                    # e.g. "{service}-{environment}-{instance_id}"<br/>      domain            = optional(string)          # for FQDN construction - local /etc/hosts entry only, never real DNS registration<br/>      variables         = optional(map(string), {}) # static substitutions, known at plan time: service, environment, role, ...<br/>    }))<br/>  })</pre> | `{}` | no |
 | <a name="input_instance_initiated_shutdown_behavior"></a> [instance\_initiated\_shutdown\_behavior](#input\_instance\_initiated\_shutdown\_behavior) | "stop" or "terminate". | `string` | `null` | no |
 | <a name="input_instance_refresh"></a> [instance\_refresh](#input\_instance\_refresh) | n/a | <pre>object({<br/>    strategy = string<br/>    preferences = optional(object({<br/>      min_healthy_percentage = optional(number)<br/>      instance_warmup        = optional(number)<br/>    }))<br/>  })</pre> | `null` | no |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | Default instance type. Ignored per-override if mixed\_instances\_policy sets its own overrides. | `string` | n/a | yes |
@@ -196,6 +154,8 @@ Both the launch template and the ASG share one tagger entry (`terraform-null-tag
 | <a name="output_launch_template_id"></a> [launch\_template\_id](#output\_launch\_template\_id) | n/a |
 | <a name="output_launch_template_latest_version"></a> [launch\_template\_latest\_version](#output\_launch\_template\_latest\_version) | n/a |
 
+
+
 ## License
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -217,9 +177,13 @@ Source: https://opensource.org/licenses/MIT
 
 
 See [LICENSE](LICENSE) for full details.
+
+
 ## Authors
 
 - Rafał Masiarek | [website](https://masiarek.pl) | [email](mailto:rafal@masiarek.pl) | [github](https://github.com/rafalmasiarek)
+
+
 
 
 <!-- references -->

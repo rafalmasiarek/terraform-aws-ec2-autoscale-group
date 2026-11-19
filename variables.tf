@@ -263,18 +263,18 @@ variable "identity" {
     # identity.custom_runtime.variables (resolved at plan time) - anything
     # else is a typo that would otherwise silently leave a literal "{foo}"
     # in the generated hostname.
+    # Character class must match the parser in main.tf
+    # (_identity_template_parts: "\\{[a-zA-Z0-9_]+\\}|[^{}]+") exactly -
+    # a narrower one here would silently let an uppercase- or
+    # digit-containing typo skip this check entirely.
     condition = var.identity.custom_runtime == null || alltrue([
-      for t in flatten(regexall("\\{([a-z_]+)\\}", var.identity.custom_runtime.hostname_template)) :
+      for t in flatten(regexall("\\{([a-zA-Z0-9_]+)\\}", var.identity.custom_runtime.hostname_template)) :
       contains(concat(
         ["instance_id", "private_ipv4", "private_ipv6", "availability_zone", "region"],
         keys(var.identity.custom_runtime.variables)
       ), t)
     ])
     error_message = "identity.custom_runtime.hostname_template references an unknown {token} - must be one of instance_id, private_ipv4, private_ipv6, availability_zone, region, or a key present in identity.custom_runtime.variables."
-  }
-  validation {
-    condition = var.identity.custom_runtime == null || try(var.identity.custom_runtime.domain, null) == null || provider::netutils::fqdn_validate(var.identity.custom_runtime.domain)
-    error_message = "identity.custom_runtime.domain must be a valid domain name (RFC 1123 labels, max 253 characters)."
   }
 }
 

@@ -1,0 +1,71 @@
+#!/bin/bash
+set -euo pipefail
+LOG=/var/log/identity-bootstrap.log
+
+sanitize_label() {
+  local s
+  s=$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//')
+  if [ $${#s} -gt 63 ]; then
+    s="$${s:0:54}-$${s: -8}"
+  fi
+  echo "$s"
+}
+
+TOKEN=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 60") || { echo "$(date -Is) IMDS token fetch failed" >> "$LOG"; exit 0; }
+
+HOSTNAME_RAW="${hostname_prefix_template}"
+
+%{ if use_instance_id ~}
+INSTANCE_ID=$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/instance-id) || { echo "$(date -Is) instance-id fetch failed" >> "$LOG"; exit 0; }
+HOSTNAME_RAW="$${HOSTNAME_RAW//\{instance_id\}/$INSTANCE_ID}"
+%{ endif ~}
+
+%{ if use_private_ipv4 ~}
+PRIVATE_IPV4=$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/local-ipv4) || { echo "$(date -Is) local-ipv4 fetch failed" >> "$LOG"; exit 0; }
+PRIVATE_IPV4_LABEL=$${PRIVATE_IPV4//./-}
+HOSTNAME_RAW="$${HOSTNAME_RAW//\{private_ipv4\}/$PRIVATE_IPV4_LABEL}"
+%{ endif ~}
+
+%{ if use_private_ipv6 ~}
+MAC=$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/mac) || { echo "$(date -Is) mac fetch failed" >> "$LOG"; exit 0; }
+PRIVATE_IPV6=$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
+  "http://169.254.169.254/latest/meta-data/network/interfaces/macs/$MAC/ipv6s" | head -n1) || true
+if [ -z "$${PRIVATE_IPV6:-}" ]; then
+  echo "$(date -Is) private_ipv6 required by hostname template but instance has no IPv6 address, aborting" >> "$LOG"
+  exit 0
+fi
+PRIVATE_IPV6_LABEL=$${PRIVATE_IPV6//:/-}
+HOSTNAME_RAW="$${HOSTNAME_RAW//\{private_ipv6\}/$PRIVATE_IPV6_LABEL}"
+%{ endif ~}
+
+%{ if use_availability_zone ~}
+AVAILABILITY_ZONE=$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/placement/availability-zone) || { echo "$(date -Is) availability-zone fetch failed" >> "$LOG"; exit 0; }
+HOSTNAME_RAW="$${HOSTNAME_RAW//\{availability_zone\}/$AVAILABILITY_ZONE}"
+%{ endif ~}
+
+%{ if use_region ~}
+REGION=$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/placement/region) || { echo "$(date -Is) region fetch failed" >> "$LOG"; exit 0; }
+HOSTNAME_RAW="$${HOSTNAME_RAW//\{region\}/$REGION}"
+%{ endif ~}
+
+HOSTNAME=$(sanitize_label "$HOSTNAME_RAW")
+
+if [ -z "$HOSTNAME" ]; then
+  echo "$(date -Is) generated hostname empty, aborting" >> "$LOG"
+  exit 0
+fi
+
+hostnamectl set-hostname "$HOSTNAME" 2>> "$LOG" || echo "$(date -Is) hostnamectl not available - hostname not applied" >> "$LOG"
+
+%{ if domain != "" ~}
+FQDN="$HOSTNAME.${domain}"
+PRIVATE_IPV4_FOR_HOSTS=$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/local-ipv4 2>/dev/null || echo "127.0.0.1")
+grep -q "$FQDN" /etc/hosts 2>/dev/null || echo "$PRIVATE_IPV4_FOR_HOSTS $FQDN $HOSTNAME" >> /etc/hosts
+%{ endif ~}

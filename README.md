@@ -140,6 +140,7 @@ Both the launch template and the ASG share one tagger entry (`terraform-null-tag
 | <a name="input_tagger_context"></a> [tagger\_context](#input\_tagger\_context) | module.tagger.context from the root stack's base terraform-null-tagger call. | `any` | `null` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Custom tags for the resource(s). | `map(string)` | `{}` | no |
 | <a name="input_termination_policies"></a> [termination\_policies](#input\_termination\_policies) | n/a | `list(string)` | `[]` | no |
+| <a name="input_topology_vpc_id"></a> [topology\_vpc\_id](#input\_topology\_vpc\_id) | VPC id, for the topology\_fragment diagram only - used solely to nest this ASG under its VPC when subnet\_ids spans more than one subnet. The module has no other reason to need a vpc\_id, so this stays optional and unused by every actual resource here. Omit it and the ASG simply floats at the top level of the merged diagram instead. | `string` | `null` | no |
 | <a name="input_update_default_version"></a> [update\_default\_version](#input\_update\_default\_version) | Set the newest launch template version as the default on every change. | `bool` | `true` | no |
 | <a name="input_use_tagger"></a> [use\_tagger](#input\_use\_tagger) | Compute and apply standardized tags via terraform-null-tagger. When false, use var.tags as-is instead. | `bool` | `true` | no |
 | <a name="input_vpc_security_group_ids"></a> [vpc\_security\_group\_ids](#input\_vpc\_security\_group\_ids) | Ignored if network\_interfaces is set (see that variable's description). | `list(string)` | `[]` | no |
@@ -153,6 +154,7 @@ Both the launch template and the ASG share one tagger entry (`terraform-null-tag
 | <a name="output_cloudinit_required_permissions"></a> [cloudinit\_required\_permissions](#output\_cloudinit\_required\_permissions) | IAM permissions required by cloud-init artifacts (S3, etc.). Attach to your instance role. Null values mean that provider's scheme is not used. |
 | <a name="output_launch_template_id"></a> [launch\_template\_id](#output\_launch\_template\_id) | n/a |
 | <a name="output_launch_template_latest_version"></a> [launch\_template\_latest\_version](#output\_launch\_template\_latest\_version) | n/a |
+| <a name="output_topology_fragment"></a> [topology\_fragment](#output\_topology\_fragment) | Network topology fragment for composition with sibling modules via provider::netutils::mermaid\_merge(). See terraform-provider-netutils's docs/topology-fragment-spec.md. |
 
 
 

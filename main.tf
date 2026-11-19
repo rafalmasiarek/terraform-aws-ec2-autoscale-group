@@ -286,6 +286,29 @@ resource "aws_autoscaling_group" "this" {
   }
 }
 
+locals {
+  # Network topology fragment for composition with sibling modules via
+  # provider::netutils::mermaid_merge() - see
+  # https://github.com/rafalmasiarek/terraform-provider-netutils/blob/main/docs/topology-fragment-spec.md
+  #
+  # Singular vs. plural attachment: one subnet nests directly; more than
+  # one has no common ancestor this module knows about unless the caller
+  # opts in via var.topology_vpc_id, so it floats at the top level
+  # instead of inventing one.
+  topology_fragment = {
+    entities = [{
+      id     = aws_autoscaling_group.this.arn
+      label  = var.name
+      kind   = "autoscaling-group"
+      parent = length(var.subnet_ids) == 1 ? var.subnet_ids[0] : var.topology_vpc_id
+    }]
+    edges = length(var.subnet_ids) > 1 ? [
+      for subnet_id in var.subnet_ids :
+      { from = aws_autoscaling_group.this.arn, to = subnet_id, kind = "deployed-in", label = null }
+    ] : []
+  }
+}
+
 resource "aws_autoscaling_lifecycle_hook" "this" {
   for_each = { for h in var.lifecycle_hooks : h.name => h }
 

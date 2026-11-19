@@ -18,3 +18,8 @@ output "cloudinit_required_permissions" {
   description = "IAM permissions required by cloud-init artifacts (S3, etc.). Attach to your instance role. Null values mean that provider's scheme is not used."
   value       = module.cloudinit.required_permissions
 }
+
+output "topology_fragment" {
+  description = "Network topology fragment for composition with sibling modules via provider::netutils::mermaid_merge(). See terraform-provider-netutils's docs/topology-fragment-spec.md."
+  value       = local.topology_fragment
+}

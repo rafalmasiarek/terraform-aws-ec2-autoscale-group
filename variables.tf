@@ -578,3 +578,9 @@ variable "cpu_alarm_low" {
   })
   default = {}
 }
+
+variable "topology_vpc_id" {
+  description = "VPC id, for the topology_fragment diagram only - used solely to nest this ASG under its VPC when subnet_ids spans more than one subnet. The module has no other reason to need a vpc_id, so this stays optional and unused by every actual resource here. Omit it and the ASG simply floats at the top level of the merged diagram instead."
+  type        = string
+  default     = null
+}
